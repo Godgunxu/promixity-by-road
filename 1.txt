@@ -1,0 +1,18 @@
+docker run --rm \
+  -e MINIO_ENDPOINT=minio-data-integration-datastore-api.apps.silver.devops.gov.bc.ca \
+  -e MINIO_ACCESS_KEY=routerdata \
+  -e MINIO_SECRET_KEY=routerdata@gov.bc.ca \
+  proximity-analysis-local \
+  /tmp/workspace \
+  site_Hybrid_geocoder_joined_export_with_block_id_TEST.csv \
+  FID \
+  SITE_ALBERS_X \
+  SITE_ALBERS_Y \
+  DISSEMINATION_BLOCK_ID \
+  OFFICE_NAM \
+  ALBERS_X \
+  ALBERS_Y \
+  0.05 \
+  3005 \
+  HLaeSgzE3uDADUnOqVsuf73ZSFgpXAdV \
+  servicebc

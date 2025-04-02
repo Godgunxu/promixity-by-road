@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: proximity-analysis-job
+spec:
+  template:
+    spec:
+      containers:
+        - name: proximity-analysis
+          image: image-registry.openshift-image-registry.svc:5000/dc318d-tools/proximity-analysis:latest
+          env:
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ENDPOINT
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_SECRET_KEY
+            - name: BC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: BC_API_KEY
+          args:
+            - "/tmp/workspace"
+            - "site_Hybrid_geocoder_joined_export_with_block_id_TEST.csv"
+            - "FID"
+            - "SITE_ALBERS_X"
+            - "SITE_ALBERS_Y"
+            - "DISSEMINATION_BLOCK_ID"
+            - "GSR_SERVICE_BC_OFFICES_SVW.csv"
+            - "OFFICE_NAM"
+            - "ALBERS_X"
+            - "ALBERS_Y"
+            - "0.05"
+            - "3005"
+            - "$(BC_API_KEY)"
+            - "servicebc"
+      restartPolicy: Never
+  backoffLimit: 1
