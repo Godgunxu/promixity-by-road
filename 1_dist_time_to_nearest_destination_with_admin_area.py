@@ -85,6 +85,8 @@ import time
 import warnings
 
 warnings.filterwarnings('ignore')
+# safe per pod limit calculated by (rate-limit / the number of pods * 0.75) e.g 1000*0.75/5=150
+pod_rate_limit = 150
 
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
@@ -442,6 +444,7 @@ for index, address_row in dfAddresses.iterrows():
 
         # Check if we are approaching the API key rate limit
         if len(timestamps) > api_rate_limit:
+        # if len(timestamps) > pod_rate_limit:
             wait_time = 60 - (
                 current_time - timestamps[0]
             )  # Time until rate limit resets
