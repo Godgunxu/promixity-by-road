@@ -1,116 +1,125 @@
-# 📍 Proximity-by-Road
+# 📍 Proximity-by-Road (OpenShift Parallel Processing)
 
-> ✍️ **Original Python script developed by Brian Kelsey**  
-> 📧 Contact: Brian.Kelsey@gov.bc.ca
+> ✍️ **Original Python script by Brian Kelsey**  
+> 📧 Contact: Brian.Kelsey@gov.bc.ca  
+> ⚙️ Maintained by [@Godgunxu](https://github.com/Godgunxu)
 
-This project calculates the **nearest facility** to each input address using Euclidean distance and the BC Route Planner API for road travel time and distance.
+This project calculates the **nearest facility** to each address using Euclidean distance followed by real-world drive time via the BC Route Planner API.
 
-It is designed to process large CSV datasets efficiently and can run locally or as a **Job in OpenShift**, pulling input data from **MinIO** and uploading results back.
+It supports **parallelized execution in OpenShift** using indexed jobs and MinIO for distributed storage.
 
 ---
 
 ## 🚀 Features
 
-- ✅ Takes input CSVs (addresses + facilities)
-- ✅ Calculates closest N facilities by Euclidean distance
-- ✅ Gets real travel time via BC Route Planner API
-- ✅ Uploads results to MinIO bucket
-- ✅ Dockerized and ready for OpenShift Job deployment
-- ✅ Supports re-running with environment variable overrides
+- ✅ Splits large address CSVs into chunks
+- ✅ Each chunk processed in parallel OpenShift Job Pods
+- ✅ Euclidean filter + real road distance lookup
+- ✅ Results uploaded to MinIO (per chunk)
+- ✅ Merges final output to one CSV
+- ✅ Fully Dockerized and CI/CD friendly
 
 ---
 
 ## 📂 Project Structure
 
-```
+```bash
 .
-├── input/                               # Optional local input directory
-├── 1_dist_time_to_nearest_destination_with_admin_area.py   # Main script
-├── run_with_minio.sh                    # Wrapper script for OpenShift job
-├── Dockerfile                           # Docker setup
-├── proximity-job.yaml                   # OpenShift job definition
-├── requirements.txt                     # Python dependencies
-```
+├── [1_dist_time_to_nearest_destination_with_admin_area.py](http://_vscodecontentref_/1)  # Core logic
+├── [run_with_minio.sh](http://_vscodecontentref_/2)              # Script run by each OpenShift Job pod
+├── [preprocess_upload.sh](http://_vscodecontentref_/3)           # Splits & uploads CSV chunks to MinIO
+├── [merge_chunks.sh](http://_vscodecontentref_/4)                # Merges output chunks into final CSV
+├── Dockerfile                     # Container definition
+├── [proximity-job.yaml](http://_vscodecontentref_/5)             # OpenShift Indexed Job definition
+├── [requirements.txt](http://_vscodecontentref_/6)               # Python requirements
+├── [README.md](http://_vscodecontentref_/7)                      # Project documentation
+````
 
----
+⸻
 
-## 🧪 Local Run (with Docker)
+🧪 Preprocessing (Split & Upload)
 
-1. **Build the Docker image:**
+chmod +x preprocess_upload.sh
+./preprocess_upload.sh site_Hybrid_geocoder.csv 20
 
-```bash
-docker build -t proximity-analysis-local .
-```
+	•	🔹 Splits into 20 even chunks
+	•	🔹 Uploads to: myminio/proximity-input/chunks/
 
-2. **Run the container with environment variables:**
+⸻
 
-```bash
-docker run --rm \
-  -e MINIO_ENDPOINT=your.minio.endpoint \
-  -e MINIO_ACCESS_KEY=your-access-key \
-  -e MINIO_SECRET_KEY=your-secret-key \
-  -e BC_API_KEY=your-bc-api-key \
-  proximity-analysis-local
-```
+☁️ OpenShift Job Deployment
 
----
+1. Build & Push Image
 
-## ☁️ OpenShift Job Deployment
+oc new-build --name=proximity-analysis --binary --strategy=docker
+oc start-build proximity-analysis --from-dir=. --follow
 
-1. **Apply the secret:**
+2. Create Secret
 
-```bash
+# minio-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-secret
+type: Opaque
+stringData:
+  MINIO_ENDPOINT: minio-data-integration-datastore-api.apps.silver.devops.gov.bc.ca
+  MINIO_ACCESS_KEY: routerdata
+  MINIO_SECRET_KEY: routerdata@gov.bc.ca
+  BC_API_KEY: <your_bc_api_key>
+
 oc apply -f minio-secret.yaml
-```
 
-2. **Start the job:**
+3. Launch Parallel Job
 
-```bash
+Edit completions in proximity-job.yaml to match chunk count and parallelism to your desired pod concurrency:
+
 oc apply -f proximity-job.yaml
-```
 
-3. **To re-run manually:**
+To re-run:
 
-```bash
 oc delete job proximity-analysis-job --ignore-not-found
 oc apply -f proximity-job.yaml
-```
 
-Or use a helper script like `rerun_job.sh`.
 
----
 
-## 🔁 Automation Options
+⸻
 
-- Use a `CronJob` to schedule runs
-- Poll MinIO or add webhook triggers to automate execution when new files arrive
+🧩 Merging Final Output
 
----
+After all jobs complete, merge all partial results:
 
-## 🔐 Required Secrets
+chmod +x merge_chunks.sh
+./merge_chunks.sh
 
-Create a secret named `minio-secret` in OpenShift with the following keys:
+	•	🔹 Downloads all from proximity-output/chunks/
+	•	🔹 Merges into final_result_<timestamp>.csv
+	•	🔹 Uploads to proximity-output/
 
-- `MINIO_ENDPOINT`
-- `MINIO_ACCESS_KEY`
-- `MINIO_SECRET_KEY`
-- `BC_API_KEY`
+⸻
 
----
+🔁 Automation Options
+	•	🕒 Use an OpenShift CronJob to schedule regular runs
+	•	🌐 Set up a MinIO webhook or use polling to trigger on new input
+	•	🔧 Tekton pipeline integration (coming soon)
 
-## 📦 Output
+⸻
 
-Results are saved to:
+📦 Output Structure
 
-```
-proximity-output/<filename>_nearest_with_admin_id_<tag>_<timestamp>.csv
-```
+Each pod writes to:
 
-These are uploaded back to your MinIO bucket automatically after processing.
+myminio/proximity-output/chunks/
 
----
+Final merged result:
 
-## 📬 Contact
+myminio/proximity-output/final_result_<timestamp>.csv
 
-Maintained by [@Godgunxu](https://github.com/Godgunxu)  
-Script Author: Brian Kelsey – 📧 Brian.Kelsey@gov.bc.ca
+
+
+⸻
+
+📬 Contact
+
+Maintainer: @Godgunxu
+Original Script: Brian Kelsey – 📧 Brian.Kelsey@gov.bc.ca
